@@ -1,0 +1,2 @@
+# Optional. Offline replay and tests need no third-party packages.
+openai-agents==0.24.0

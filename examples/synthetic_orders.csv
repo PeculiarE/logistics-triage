@@ -1,0 +1,13 @@
+Order Id,Order Item Id,Order Item Total,Days for shipping (real),Days for shipment (scheduled),Delivery Status,Order Status,Shipping Mode
+DEMO-001,ITEM-001,120,5,4,Late delivery,COMPLETE,Standard Class
+DEMO-001,ITEM-002,80,5,4,Late delivery,COMPLETE,Standard Class
+DEMO-002,ITEM-003,150,6,2,Late delivery,COMPLETE,Second Class
+DEMO-003,ITEM-004,900,5,4,Late delivery,COMPLETE,Standard Class
+DEMO-004,ITEM-005,95,4,4,Shipping on time,COMPLETE,Standard Class
+DEMO-005,ITEM-006,60,,4,Late delivery,PROCESSING,Standard Class
+DEMO-006,ITEM-007,70,3,4,Advance shipping,COMPLETE,Standard Class
+DEMO-007,ITEM-008,180,5,4,Late delivery,ON_HOLD,Standard Class
+DEMO-008,ITEM-009,100,5,4,Shipping canceled,CANCELED,Standard Class
+DEMO-009,ITEM-010,50,3,4,Late delivery,COMPLETE,Standard Class
+DEMO-010,ITEM-011,40,5,4,Late delivery,COMPLETE,Standard Class
+DEMO-010,ITEM-012,60,6,4,Late delivery,COMPLETE,Standard Class
