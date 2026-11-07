@@ -140,3 +140,11 @@ Next research steps: replace historical outcomes with time-correct snapshots, va
 Constante, Fabian; Silva, Fernando; Pereira, António (2019), **DataCo SMART SUPPLY CHAIN FOR BIG DATA ANALYSIS**, Mendeley Data, V3. DOI: [10.17632/8gx2fvg2k6.3](https://doi.org/10.17632/8gx2fvg2k6.3). Source licence: **CC BY 4.0**, as stated on the [dataset page](https://data.mendeley.com/datasets/8gx2fvg2k6/3).
 
 Transformations: selected non-customer columns, grouped item rows into orders, summed item totals, calculated recorded delay, applied illustrative rules, and generated simulated queues. This project is independent and is not affiliated with or endorsed by Scania or the dataset contributors.
+
+## Model and API usage records
+
+New live runs save an `ai` object in each `decisions.jsonl` record, containing `configured_model` and SDK-reported `usage`: request count, input tokens, output tokens, total tokens, cached input tokens and reasoning output tokens. Counts cover the order's completed SDK run, including tool-use turns. Cached tokens are a subset of input tokens and reasoning tokens a subset of output tokens; do not add them again to the total.
+
+`summary.json` includes `ai_usage`, listing configured models, orders with and without usage, and sums of reported usage. Offline runs use `null` for AI metadata. Failed runs without a returned SDK result have unavailable (`null`) usage, even if some requests may have been billed. Reported totals are not a billing statement and may omit failed requests or retries. SDK-normalized counts may also omit provider detail. No monetary cost is calculated.
+
+The configured model name may be an alias; it is not a verified resolved model version. The HTML report still shows routing results; inspect the JSON files for model and usage details. Historical run files are unchanged and cannot have missing token counts reconstructed by this change. No API keys are stored in the metadata.

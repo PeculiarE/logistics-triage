@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from triage import Order, Policy, decide
+from triage import Order, Policy, decide, summarize_ai_usage
 from sdk_agent import make_proposer
 
 try:
@@ -38,7 +38,7 @@ if SDK_AVAILABLE:
                                    "rationale": "Scripted SDK integration test; not model intelligence."})
                 output = [ResponseOutputMessage(id="message_1", role="assistant", type="message", status="completed",
                           content=[ResponseOutputText(type="output_text", text=text, annotations=[])])]
-            return ModelResponse(output=output, usage=Usage(), response_id=f"test_{self.turn}")
+            return ModelResponse(output=output, usage=Usage(requests=1, input_tokens=100, output_tokens=20, total_tokens=120), response_id=f"test_{self.turn}")
 
         async def stream_response(self, *args, **kwargs):
             raise NotImplementedError("Streaming not used in this prototype")
@@ -61,6 +61,34 @@ class SDKTests(unittest.TestCase):
         tool_results = json.dumps(model.inputs[-1])
         self.assertIn("SYNTHETIC", tool_results)
         self.assertIn("max_auto_value", tool_results)
+
+    def test_usage_accumulates_tools_and_final_turn_and_resets_on_failure(self):
+        model = ScriptedModel()
+        proposer = make_proposer(model=model)
+        proposer(self.order, self.policy)
+        metadata = proposer.last_metadata
+        self.assertEqual(metadata["configured_model"], "ScriptedModel")
+        self.assertEqual(metadata["usage"]["requests"], 2)
+        self.assertEqual(metadata["usage"]["input_tokens"], 200)
+        self.assertEqual(metadata["usage"]["output_tokens"], 40)
+        self.assertEqual(metadata["usage"]["total_tokens"], 240)
+        model.fail = True
+        with self.assertRaises(TimeoutError):
+            proposer(self.order, self.policy)
+        self.assertIsNone(proposer.last_metadata["usage"])
+        summary = summarize_ai_usage([{"ai": metadata}, {"ai": metadata},
+                                      {"ai": proposer.last_metadata}])
+        self.assertEqual(summary["reported_totals"]["total_tokens"], 480)
+        self.assertEqual(summary["orders_with_usage"], 2)
+        self.assertEqual(summary["orders_without_usage"], 1)
+        self.assertIsNone(summarize_ai_usage([{"ai": proposer.last_metadata}])["reported_totals"])
+        json.dumps(summary, allow_nan=False)
+
+    def test_usage_preserved_when_required_tool_check_rejects_output(self):
+        proposer = make_proposer(model=ScriptedModel(call_tools=False))
+        with self.assertRaises(RuntimeError):
+            proposer(self.order, self.policy)
+        self.assertEqual(proposer.last_metadata["usage"]["total_tokens"], 120)
 
     def test_sdk_missing_evidence_tools_is_rejected(self):
         with self.assertRaises(RuntimeError):

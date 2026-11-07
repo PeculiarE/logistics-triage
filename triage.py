@@ -177,6 +177,20 @@ def decide(order, proposal, policy, mode="offline", error=None):
     }
 
 
+def summarize_ai_usage(decisions):
+    """Sum SDK-reported usage only; missing usage must not imply a free request."""
+    records = [d["ai"] for d in decisions if d.get("ai") is not None]
+    reported = [r["usage"] for r in records if r["usage"] is not None]
+    keys = ("requests", "input_tokens", "output_tokens", "total_tokens",
+            "cached_input_tokens", "reasoning_output_tokens")
+    return {
+        "configured_models": sorted({r["configured_model"] for r in records}),
+        "orders_with_usage": len(reported),
+        "orders_without_usage": len(records) - len(reported),
+        "reported_totals": {k: sum(u[k] for u in reported) for k in keys} if reported else None,
+    }
+
+
 def execute_simulation(decision):
     """Return a local queue event. There are no external side effects."""
     return {
@@ -270,6 +284,7 @@ def main():
             except Exception as exc:
                 # Do not write exception messages, which could contain request details or secrets.
                 decision = decide(order, None, policy, args.mode, type(exc).__name__)
+            decision["ai"] = getattr(proposer, "last_metadata", None) if args.mode == "openai" else None
             decision["run_id"] = run_id
             log.write(json.dumps(decision, allow_nan=False) + "\n")
             queues.write(json.dumps(execute_simulation(decision), allow_nan=False) + "\n")
@@ -281,6 +296,7 @@ def main():
         "mode": args.mode, "policy": asdict(policy),
         "decisions": dict(Counter(d["final_action"] for d in decisions)),
         "agent_failures": sum(d["agent_error_type"] is not None for d in decisions),
+        "ai_usage": summarize_ai_usage(decisions) if args.mode == "openai" else None,
         "simulation_only": True, "retrospective": True,
     }
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

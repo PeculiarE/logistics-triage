@@ -33,7 +33,7 @@ The generated full-dataset report was also checked in a browser: 120 balanced ex
 
 ## Live AI smoke tests — 7 November 2026
 
-The user ran the existing OpenAI mode with `OPENAI_MODEL=gpt-5-mini`. The saved summaries and decision records were inspected locally. The model name comes from the terminal setup in the session: the current audit format does not save the configured model name or resolved model version.
+The user ran the existing OpenAI mode with `OPENAI_MODEL=gpt-5-mini`. The saved summaries and decision records were inspected locally. The model name comes from the terminal setup in the session: the audit format used for those runs did not save the configured model name or resolved model version. New runs now record the configured name, but not a resolved version.
 
 | Run ID | Orders processed | Monitor | Human review | No action | Recorded agent failures |
 |---|---:|---:|---:|---:|---:|
@@ -51,3 +51,7 @@ These smoke tests demonstrate that the live model connection, structured recomme
 ## What remains untested
 
 An operational evaluation needs decision-time data snapshots, expert-labelled acceptable actions, independently held-out cases, a deterministic baseline, and measures of unsafe auto-actions, escalation quality, coverage, latency and cost. The source data does not provide ground-truth triage actions or verified material criticality.
+
+## Usage logging verification
+
+After adding model and usage metadata, all 22 automated tests passed locally. Two added scripted-SDK tests verify multi-turn token accumulation, summary totals, unavailable usage after failure without reuse of a preceding order's counts, and usage retention when the required-tool check rejects an answer. No paid model calls were made to validate this change. Earlier live smoke-test records remain unchanged.
