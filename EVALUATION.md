@@ -1,6 +1,6 @@
 # Verification record
 
-Run date: 30 October 2026. All operational actions were simulated.
+Offline verification: 30 October 2026. Live smoke tests: 7 November 2026. All operational actions were simulated.
 
 ## Full DataCo v3 offline replay
 
@@ -31,8 +31,23 @@ Without the optional dependencies, the four SDK tests are skipped and the 16 cor
 
 The generated full-dataset report was also checked in a browser: 120 balanced example rows displayed, the Monitor filter returned 40 examples, an unmatched search returned zero rows, and a 390-pixel viewport had no page overflow. The full audit was checked for exactly one decision and queue event per distinct order and an exact match to the retained-field allowlist.
 
-## What remains untested
+## Live AI smoke tests — 7 November 2026
 
-The optional integration has not been exercised against a live OpenAI model because no API key is configured. The scripted model verifies SDK plumbing, not AI reasoning. A live smoke test on five synthetic cases is the next step.
+The user ran the existing OpenAI mode with `OPENAI_MODEL=gpt-5-mini`. The saved summaries and decision records were inspected locally. The model name comes from the terminal setup in the session: the current audit format does not save the configured model name or resolved model version.
+
+| Run ID | Orders processed | Monitor | Human review | No action | Recorded agent failures |
+|---|---:|---:|---:|---:|---:|
+| `20261107T181349Z-42802bab` | 5 | 0 | 3 | 2 | 0 |
+| `20261107T213402Z-63e7d391` | 10 | 1 | 7 | 2 | 0 |
+
+Both runs used policy v1.0 and the bundled synthetic CSV, with source SHA-256 `41ad320928d3c3529352471bd89e5c8b963712b9961d3e1bfbcfa6f981d9d3ce`. These are 15 order evaluations across 10 distinct fictional orders, not 15 independent cases. The five-order sample is included in the ten-order run.
+
+Every saved proposal action matched its final action in these runs. The ten-order totals also match the synthetic fixture's expected policy routing. DEMO-001 received a MONITOR proposal with self-reported confidence 0.92, which the policy gate accepted. No policy override occurred in these runs; rejection of unsafe proposals is covered separately by automated tests.
+
+The SDK adapter requires both evidence tools to execute before returning a proposal. All 15 records contain successful proposals without recorded agent errors. Detailed tool-call traces, model-version metadata, token usage and cost were not saved. Raw run files remain local under `runs/` and are excluded from Git; this document records the reviewed results without publishing credentials or local logs.
+
+These smoke tests demonstrate that the live model connection, structured recommendations and policy gate worked on these examples. They do not establish calibrated confidence, broad reliability, operational effectiveness or performance on the full DataCo dataset. Live model calls do not change the meaning of `simulation_only`: queue actions are still local simulations, with no real notifications, shipment changes or scheduled rechecks.
+
+## What remains untested
 
 An operational evaluation needs decision-time data snapshots, expert-labelled acceptable actions, independently held-out cases, a deterministic baseline, and measures of unsafe auto-actions, escalation quality, coverage, latency and cost. The source data does not provide ground-truth triage actions or verified material criticality.

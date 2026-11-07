@@ -2,7 +2,7 @@
 
 A historical logistics replay that sends minor, low-value delays to a **simulated monitoring queue** and routes uncertain or higher-impact cases to **human review**. An optional OpenAI Agents SDK agent gathers evidence with tools and proposes an action; deterministic application rules enforce the final decision.
 
-**Status:** Offline replay implemented. Optional live AI integration requires a locally configured API key and an available model. All actions are simulated. This is a research prototype, not a production logistics system.
+**Status:** Offline replay implemented; live AI smoke tests completed on 7 November 2026 using synthetic orders (five-order and ten-order runs, zero recorded agent failures). The ten-order run produced 1 monitor, 7 human review, and 2 no-action decisions. See [EVALUATION.md](EVALUATION.md) for evidence and limitations. Live mode requires your own locally configured API key and available model. All operational actions remain simulated; no tracking follow-ups or human notifications are implemented. This is a research prototype, not a production logistics system.
 
 ![Synthetic historical replay report](docs/demo.png)
 
@@ -105,7 +105,7 @@ Those `read` commands use macOS's default zsh shell. `.env.example` documents th
 
 Start with the synthetic dataset. The live mode caps each run at 20 orders and each order at six SDK turns. These caps bound the demo size, not its monetary cost. SDK tracing uploads are disabled; local audit records are used instead.
 
-The SDK agent calls `inspect_order` and `inspect_policy`, then returns a structured recommendation. The host verifies that both tools were called and applies the independent policy gate. Only allowlisted order fields are exposed. The live integration is optional and must be tested with a real model before claiming live-agent results.
+The SDK agent calls `inspect_order` and `inspect_policy`, then returns a structured recommendation. The host verifies that both tools were called and applies the independent policy gate. Only allowlisted order fields are exposed. The optional live integration has completed basic smoke tests on the bundled synthetic cases. These tests establish a working connection and workflow on those cases, not real-world decision quality.
 
 Documentation: [OpenAI Agents SDK quickstart](https://developers.openai.com/api/docs/guides/agents/quickstart).
 
