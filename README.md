@@ -151,6 +151,4 @@ The configured model name may be an alias; it is not a verified resolved model v
 
 ## New: investigate a shipment discrepancy
 
-A separate fictional two-case investigation demo is available in [INVESTIGATION.md](INVESTIGATION.md). Run `python investigation.py` for the scripted walkthrough, or `python investigation.py --mode openai` after API setup. The host validates retrieved carrier evidence before recording simulated queue entries. The DataCo replay is unchanged. The new adapter has scripted-SDK tests and awaits live review.
-
-Run `python investigation.py --suite challenges` for stale-scan, wrong-shipment and unavailable-carrier cases, or add `--mode openai` for live calls. Use `--suite all` for all five. The challenges have automated coverage and await live review.
+A separate, fictional investigation demo (two basic cases and three boundary cases) is available in [INVESTIGATION.md](INVESTIGATION.md). Run `python investigation.py` for the no-API scripted walkthrough, or `python investigation.py --mode openai` after local API setup to let a live model choose evidence tools. The host validates retrieved carrier evidence before writing simulated queue entries. The DataCo replay remains unchanged. The two basic cases have also been reviewed with a live model. All three boundary cases have also been run with a live model and reviewed; the results are recorded in EVALUATION.md. Run them with `python investigation.py --mode openai --suite challenges`.

@@ -41,7 +41,7 @@ The immediate-escalation comparison sends both initial discrepancies to review w
 
 These two hand-authored examples have developer-defined expected outcomes. They are not a held-out benchmark or domain-expert validation. Broader evaluation, human decision rights and criticality criteria should be established with logistics practitioners.
 
-This new adapter has been tested with scripted SDK models; a live run and review are the next step.
+The two basic cases were also run with gpt-5-mini on 8 November 2026 and their saved evidence and proposals reviewed: CASE-RESOLVED used the carrier tool and finished MONITOR; CASE-UNCONFIRMED used carrier then warehouse and finished ESCALATE. Neither recorded an agent error. See EVALUATION.md. The three challenge cases were subsequently reviewed with a live model as well; all proposed and finished ESCALATE under the written policy. See EVALUATION.md.
 
 MONITOR still means a local monitoring entry. ESCALATE still means a local human-review entry. There is no scheduler, real notification, carrier integration or operational case-management service.
 
