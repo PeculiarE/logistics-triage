@@ -84,3 +84,5 @@ Reviewed local run `investigation-20261108T224752Z-82e592dc` with configured mod
 | CASE-CARRIER-UNAVAILABLE | ESCALATE | ESCALATE | 3 | 2,754 |
 
 All three proposals cited retrieved evidence and matched the configured expected outcomes. Each invoked both carrier and warehouse tools. There were zero recorded agent failures and one deliberate carrier-source timeout. No unsafe proposal was overridden in this live run: the model itself proposed escalation in each case. Tool traces record execution order, not necessarily separate model turns (both tools can be requested together). These small developer-defined tests establish behaviour on the fixtures, not policy validity or business effectiveness. Raw run records remain local and ignored by Git.
+
+**Policy review, 9 November 2026:** The stale-scan outcome follows an age rule now recognised as poorly justified for establishing a past collection event. Passing that case is evidence of rule compliance, not correct business policy. Code and expected outcome are still unchanged; see INVESTIGATION.md for the proposed correction.

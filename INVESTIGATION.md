@@ -80,3 +80,9 @@ Warehouse preparation evidence remains available in each challenge, but cannot e
 A source timeout is distinct from an agent/provider failure. `Source errors: 1` is expected in a run that queries the deliberately unavailable carrier. Inspect the trace for `TimeoutError`; `agent_error_type` can remain null because the model successfully received and handled the tool's error result. The fixture's failure settings are not sent to the model in the starting information.
 
 All 39 automated tests passed after adding the challenges. Four new tests cover scenario routing, isolation of the age limit, source-versus-agent failures, and actual SDK runs with deliberately unsafe scripted MONITOR proposals. Those proposals are overridden to ESCALATE by the host. This does not claim that a live model made those mistakes.
+
+## Known policy issue — identified 9 November 2026
+
+The 60-minute age rule is not well justified for the question “Was this shipment collected?” A valid older collection scan can still establish that event. This should be distinguished from freshness requirements for current location or ETA. CASE-STALE-SCAN demonstrates adherence to the written rule, not that its escalation is operationally appropriate.
+
+The rule and fixture expectation have not yet been changed. A proposed correction is to accept valid historical collection evidence regardless of its age alone, while still enforcing shipment identity, decision-time availability and contradictory-event checks. Freshness requirements for current operational status need a separate, explicitly defined policy. Historical run records should retain their original policy and outcomes when that change is implemented.

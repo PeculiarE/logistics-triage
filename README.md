@@ -152,3 +152,5 @@ The configured model name may be an alias; it is not a verified resolved model v
 ## New: investigate a shipment discrepancy
 
 A separate, fictional investigation demo (two basic cases and three boundary cases) is available in [INVESTIGATION.md](INVESTIGATION.md). Run `python investigation.py` for the no-API scripted walkthrough, or `python investigation.py --mode openai` after local API setup to let a live model choose evidence tools. The host validates retrieved carrier evidence before writing simulated queue entries. The DataCo replay remains unchanged. The two basic cases have also been reviewed with a live model. All three boundary cases have also been run with a live model and reviewed; the results are recorded in EVALUATION.md. Run them with `python investigation.py --mode openai --suite challenges`.
+
+**Known investigation policy issue:** the stale-scan age limit is under review; age alone does not invalidate evidence that collection occurred. See the policy issue in [INVESTIGATION.md](INVESTIGATION.md). The current rule has not yet been changed.
