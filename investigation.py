@@ -10,19 +10,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 POLICY = {
-    'version': 'investigation-1.0',
+    'version': 'investigation-1.1',
     'max_value': 500,
     'max_estimated_delay_days': 1,
-    'max_evidence_age_minutes': 60,
     'rules': [
         'Only a carrier COLLECTED event can establish carrier collection.',
         'The event must match the shipment, be observed and available by decision time, '
-        'be no more than 60 minutes old, and occur after the initial no-collection observation.',
+        'and occur after the initial no-collection observation. Age alone does not invalidate collection evidence.',
         'Warehouse PREPARED or DISPATCHED alone cannot prove carrier collection.',
         'The latest retrieved carrier event must be COLLECTED; contradictory latest events require review.',
         'MONITOR requires value at most 500, estimated delay from 0 to 1 day, '
         'order status DISPATCHED, and a citation to qualifying retrieved carrier evidence.',
-        'Escalate missing, stale, conflicting or unavailable evidence. Do not invent a cause.',
+        'Escalate missing, conflicting or unavailable evidence. Do not invent a cause.',
         'All tools and queue actions are simulated. MONITOR does not schedule another check.',
     ],
 }
@@ -52,7 +51,7 @@ def scenarios(suite="basic"):
         available_at='2026-11-08T09:31:00+00:00', note='Prepared for collection; pickup not confirmed.')]
     basic = [resolved, unresolved]
     stale = deepcopy(resolved)
-    stale.update(case_id='CASE-STALE-SCAN', expected_action='ESCALATE',
+    stale.update(case_id='CASE-STALE-SCAN', expected_action='MONITOR',
                  initial_observed_at='2026-11-08T08:00:00+00:00')
     stale['carrier'][0].update(observed_at='2026-11-08T08:30:00+00:00',
                                available_at='2026-11-08T08:32:00+00:00')
@@ -128,7 +127,7 @@ def qualifying_collection(case, evidence):
         latest = [r for r in carrier if timestamp(r['observed_at']) == latest_at]
         if any(r['status'] != 'COLLECTED' for r in latest):
             return None
-        if latest_at <= start or not 0 <= (now - latest_at).total_seconds() <= 60 * POLICY['max_evidence_age_minutes']:
+        if latest_at <= start:
             return None
         return latest[0]['evidence_id']
     except (KeyError, TypeError, ValueError):
@@ -149,7 +148,7 @@ def enforce(case, proposal, desk, error=None):
     elif proposal['action'] == 'ESCALATE':
         reason = 'Investigator requested human review; collection has not been accepted for monitoring.'
     elif citation and citation in proposal['evidence_ids']:
-        action, reason = 'MONITOR', 'Recent carrier collection evidence resolves the initial discrepancy; limits are met.'
+        action, reason = 'MONITOR', 'Qualifying carrier collection evidence resolves the initial discrepancy; limits are met.'
     elif citation:
         reason = 'Proposal did not cite the required collection evidence.'
     return {'final_action': action, 'reason': reason}
@@ -161,7 +160,7 @@ def scripted_proposal(case, desk):
     citation = qualifying_collection(case, desk.evidence)
     if citation:
         return {'action': 'MONITOR', 'evidence_ids': [citation],
-                'rationale': 'Scripted: recent collection scan meets the monitoring policy.'}
+                'rationale': 'Scripted: collection scan meets the monitoring policy.'}
     desk.read('warehouse')
     return {'action': 'ESCALATE', 'evidence_ids': [r['evidence_id'] for r in desk.evidence],
             'rationale': 'Scripted: available evidence does not establish permitted monitoring.'}
@@ -216,7 +215,7 @@ section{background:white;border:1px solid #cbd6d1;border-radius:12px;padding:24p
 pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef3f1;padding:12px;font-size:14px}h1,h2{line-height:1.3}</style>
 <h1>Shipment investigation</h1><p>Mode: <b>''' + mode + '''</b>. Fictional sources and simulated queue actions.
 Scripted mode uses fixed logic, not a live AI. There are no real notifications or scheduled rechecks.</p>
-<p>The initial mismatch triggers investigation. A recent carrier collection scan may resolve it;
+<p>The initial mismatch triggers investigation. A qualifying carrier collection scan may resolve it;
 warehouse preparation alone cannot. Expected outcomes are developer-defined examples, not business validation.</p>''' + ''.join(cards) + '</html>')
 
 

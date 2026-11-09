@@ -16,10 +16,10 @@ Default mode is **scripted**: deterministic logic chooses the tools and proposal
 
 Both scenarios start at the same fictional decision time, 8 November 2026 at 10:00 UTC. The order system says DISPATCHED, while the initial carrier snapshot at 09:00 says NO_COLLECTION_RECORDED. The value is 200, and the estimated delay at decision time is half a day. This is an estimate for an active fictional shipment, not the final actual duration used in DataCo replay.
 
-1. **CASE-RESOLVED:** The carrier tool returns collection scan C-001, observed at 09:40 and available at 09:42. It is newer than the initial snapshot and sufficiently recent. The scripted investigator recommends MONITOR and cites C-001. The host checks those facts and permits a simulated monitoring entry.
+1. **CASE-RESOLVED:** The carrier tool returns collection scan C-001, observed at 09:40 and available at 09:42. It is newer than the initial snapshot and available by decision time. The scripted investigator recommends MONITOR and cites C-001. The host checks those facts and permits a simulated monitoring entry.
 2. **CASE-UNCONFIRMED:** Carrier evidence still reports no collection. The scripted investigator then checks warehouse evidence. W-001 says PREPARED, not collected. The investigator recommends ESCALATE with the retrieved evidence references, and the host saves a simulated human-review entry.
 
-Source priority is explicit: carrier collection scans can establish collection; warehouse preparation cannot. A newer scan can supersede the earlier absence of a scan. Missing, future, stale, conflicting, wrong-shipment or failed-source evidence cannot authorize monitoring. Freshness is evaluated against the fixed scenario decision time, not today's clock.
+Source priority is explicit: carrier collection scans can establish collection; warehouse preparation cannot. A newer scan can supersede the earlier absence of a scan. Missing, future, conflicting, wrong-shipment or failed-source evidence cannot authorize monitoring. Under policy investigation-1.1, age alone does not invalidate a past collection event. Timing is evaluated against the fixed scenario decision time, not today's clock.
 
 ## Let the live agent investigate
 
@@ -41,7 +41,7 @@ The immediate-escalation comparison sends both initial discrepancies to review w
 
 These two hand-authored examples have developer-defined expected outcomes. They are not a held-out benchmark or domain-expert validation. Broader evaluation, human decision rights and criticality criteria should be established with logistics practitioners.
 
-The two basic cases were also run with gpt-5-mini on 8 November 2026 and their saved evidence and proposals reviewed: CASE-RESOLVED used the carrier tool and finished MONITOR; CASE-UNCONFIRMED used carrier then warehouse and finished ESCALATE. Neither recorded an agent error. See EVALUATION.md. The three challenge cases were subsequently reviewed with a live model as well; all proposed and finished ESCALATE under the written policy. See EVALUATION.md.
+The two basic cases were also run with gpt-5-mini on 8 November 2026 and their saved evidence and proposals reviewed: CASE-RESOLVED used the carrier tool and finished MONITOR; CASE-UNCONFIRMED used carrier then warehouse and finished ESCALATE. Neither recorded an agent error. See EVALUATION.md. The three challenge cases were subsequently reviewed with a live model as well; all proposed and finished ESCALATE under the then-current policy 1.0. A subsequent live review of policy 1.1 confirmed MONITOR for the old valid scan and ESCALATE for the other two challenges. See EVALUATION.md.
 
 MONITOR still means a local monitoring entry. ESCALATE still means a local human-review entry. There is no scheduler, real notification, carrier integration or operational case-management service.
 
@@ -71,18 +71,20 @@ Use `--suite all` for all five cases. The default `--suite basic` preserves the 
 
 | Case | Deliberately unsuitable evidence | Expected final decision |
 |---|---|---|
-| CASE-STALE-SCAN | Collection at 08:30, after the initial 08:00 snapshot, but 90 minutes before the 10:00 decision; example policy permits at most 60 minutes | ESCALATE |
+| CASE-STALE-SCAN | Valid collection at 08:30, after the initial 08:00 snapshot, available before the 10:00 decision; age alone does not invalidate collection | MONITOR |
 | CASE-WRONG-SHIPMENT | Recent collection scan identifies SHIP-OTHER rather than SHIP-001 | ESCALATE |
 | CASE-CARRIER-UNAVAILABLE | Simulated carrier lookup raises a timeout; no carrier evidence is returned | ESCALATE |
 
-Warehouse preparation evidence remains available in each challenge, but cannot establish collection. The freshness limit is an illustrative policy, not a claim that collection stops being true after an hour.
+Warehouse preparation evidence remains available in each challenge, but cannot establish collection. The former 60-minute collection age limit was removed in policy 1.1. Current location and ETA freshness would need their own policy.
 
 A source timeout is distinct from an agent/provider failure. `Source errors: 1` is expected in a run that queries the deliberately unavailable carrier. Inspect the trace for `TimeoutError`; `agent_error_type` can remain null because the model successfully received and handled the tool's error result. The fixture's failure settings are not sent to the model in the starting information.
 
-All 39 automated tests passed after adding the challenges. Four new tests cover scenario routing, isolation of the age limit, source-versus-agent failures, and actual SDK runs with deliberately unsafe scripted MONITOR proposals. Those proposals are overridden to ESCALATE by the host. This does not claim that a live model made those mistakes.
+All 39 automated tests passed after adding the challenges. Four new tests cover scenario routing, isolation of the age limit, source-versus-agent failures, and actual SDK runs with deliberately unsafe scripted MONITOR proposals. Under policy 1.0, those proposals were overridden to ESCALATE by the host. Updated tests for policy 1.1 accept MONITOR for the old valid scan and still reject it for the other two challenges. This does not claim that a live model made those mistakes.
 
-## Known policy issue — identified 9 November 2026
+## Collection-age policy correction — 9 November 2026
 
-The 60-minute age rule is not well justified for the question “Was this shipment collected?” A valid older collection scan can still establish that event. This should be distinguished from freshness requirements for current location or ETA. CASE-STALE-SCAN demonstrates adherence to the written rule, not that its escalation is operationally appropriate.
+Policy `investigation-1.1` removes the 60-minute maximum age for collection evidence. A valid older scan can establish that collection happened; requirements for current location or ETA freshness are a separate question.
 
-The rule and fixture expectation have not yet been changed. A proposed correction is to accept valid historical collection evidence regardless of its age alone, while still enforcing shipment identity, decision-time availability and contradictory-event checks. Freshness requirements for current operational status need a separate, explicitly defined policy. Historical run records should retain their original policy and outcomes when that change is implemented.
+CASE-STALE-SCAN retains its ID so it can be compared with earlier runs, but now expects MONITOR. The scan must still match the shipment, be available by decision time and occur after the initial no-collection snapshot. Invalid timing, contradictory latest carrier events, source failures and the other monitoring limits still prevent automatic monitoring.
+
+Both the executable check and the policy text sent to the model were updated. All 39 tests pass, including an actual SDK run with a scripted model accepting the old scan. A scripted run of all five scenarios yields 2 MONITOR and 3 ESCALATE. The user subsequently ran the three challenges with gpt-5-mini; the saved proposals and final decisions matched those expectations, with zero agent failures and one deliberate source timeout. Historical reports retain policy 1.0 and their original outcomes.

@@ -11,7 +11,7 @@ The project has two separate demonstrations:
 
 **Current status:** Both demonstrations have been exercised with a live model on synthetic examples. All **39 automated tests** passed with the optional SDK installed. All operational actions remain simulated: there are no real carrier connections, customer messages, shipment changes or scheduled rechecks. See [EVALUATION.md](EVALUATION.md) for the verification record.
 
-**Known policy issue:** The investigation currently rejects collection scans older than 60 minutes. That rule is poorly justified for establishing whether a past collection occurred: age alone does not invalidate the event. The code and stale-scan expected outcome have not yet been corrected. See [the investigation walkthrough](INVESTIGATION.md) for the policy review.
+**Policy update (9 November 2026):** Investigation policy `investigation-1.1` no longer rejects collection evidence because of age alone. CASE-STALE-SCAN now expects MONITOR when the other checks pass. Earlier live results used policy 1.0 and are preserved; policy 1.1 has automated, scripted and reviewed live-model verification on the three challenge cases.
 
 ## Run locally without API calls
 
@@ -36,7 +36,7 @@ The original two investigation cases are:
 - **CASE-RESOLVED:** A newer carrier collection scan resolves the initial discrepancy → MONITOR.
 - **CASE-UNCONFIRMED:** Carrier evidence does not confirm collection; warehouse evidence says only PREPARED → ESCALATE.
 
-The challenge suite covers an old collection scan, a scan for the wrong shipment, and a simulated carrier timeout. All currently escalate under the written policy; the old-scan rule has the limitation noted above.
+The challenge suite covers an old collection scan, a scan for the wrong shipment, and a simulated carrier timeout. Under policy 1.1, the old valid collection scan permits MONITOR; the wrong-shipment and carrier-timeout cases still require ESCALATE.
 
 ## Run with a live model
 
@@ -116,7 +116,7 @@ Initial discrepancy → choose evidence tools → inspect returned evidence → 
 
 `investigation.py` provides scenarios, source adapters, evidence checks and reporting. `investigation_agent.py` provides the live model instructions and tool loop. The model can request carrier and warehouse evidence; scripted mode instead chooses steps through fixed logic.
 
-A monitoring proposal must cite a qualifying carrier record actually retrieved during the investigation. Warehouse preparation does not prove collection. The host checks shipment identity, event times, availability by the scenario's decision time, the current age limit, status and value limits. A source failure prevents automatic monitoring.
+A monitoring proposal must cite a qualifying carrier record actually retrieved during the investigation. Warehouse preparation does not prove collection. The host checks shipment identity, event times, availability by the scenario's decision time, chronology relative to the initial discrepancy, status and value limits. A source failure prevents automatic monitoring.
 
 The model does not receive expected answers or fixture failure settings. The report records tool execution order and results, not hidden model reasoning. Multiple tools can be requested in one model turn.
 
@@ -129,7 +129,8 @@ See [INVESTIGATION.md](INVESTIGATION.md) for the full walkthrough and policy det
 | Full DataCo offline replay | 65,752 orders: 8,155 MONITOR, 30,748 ESCALATE, 26,849 NO_ACTION |
 | Live triage on ten distinct synthetic orders (five-order and ten-order runs) | No recorded agent failures; ten-order run: 1 MONITOR, 7 ESCALATE, 2 NO_ACTION |
 | Live investigation on two basic scenarios | 1 MONITOR, 1 ESCALATE; no recorded agent failures |
-| Live investigation on three challenge scenarios | 3 ESCALATE; no recorded agent failures, one intentionally simulated source timeout |
+| Live investigation on three challenge scenarios (policy 1.0) | 3 ESCALATE; no recorded agent failures, one intentionally simulated source timeout |
+| Live challenge scenarios (policy 1.1) | 1 MONITOR, 2 ESCALATE; no recorded agent failures, one intentional source timeout |
 | Automated test suite | 39 passing tests with the optional SDK installed |
 
 Run the tests without model calls:
@@ -140,9 +141,9 @@ python -m unittest -v
 
 Tests cover data handling, policy boundaries, evidence citations and timestamps, source failures, reporting, usage logging and actual SDK tool loops with scripted models. Without optional dependencies, SDK tests are skipped.
 
-**These results do not demonstrate an advantage over rules.** The scripted investigator reaches the same categories on the five examples. The immediate-escalation baseline in the audit is a comparison label: it represents sending a discrepancy straight to human review without investigating. It has less information than either investigator, so resolving more cases than that baseline does not establish AI superiority.
+**These results do not demonstrate an advantage over rules.** Under policy 1.0, the scripted and live investigators reached the same categories on the five examples. The three policy 1.1 challenge cases also produced matching scripted and live decisions. The immediate-escalation baseline in the audit is a comparison label: it represents sending a discrepancy straight to human review without investigating. It has less information than either investigator, so resolving more cases than that baseline does not establish AI superiority.
 
-The scenarios have developer-defined expectations. Rule compliance, including compliance with the disputed old-scan rule, is not proof of business correctness. Independent cases, domain-expert judgements and operational evaluation are still needed.
+The scenarios have developer-defined expectations. Rule compliance is not proof of business correctness; review of the old-scan rule led to the policy 1.1 correction. Independent cases, domain-expert judgements and operational evaluation are still needed.
 
 ## Output files and usage records
 
@@ -185,7 +186,7 @@ Only allowlisted logistics fields are retained from the CSV. Customer names, ema
 
 ## Next development priorities
 
-- Correct and test the distinction between historical collection evidence and freshness of current status.
+- Define any future freshness requirements for current location or ETA separately from collection history.
 - Validate decision rights, evidence requirements and thresholds with logistics practitioners.
 - Compare the live investigator against a scripted investigator with equal access to evidence on independent cases.
 - Evaluate unsafe actions, unnecessary escalations, explanation quality, time and API usage.

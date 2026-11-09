@@ -48,7 +48,7 @@ class InvestigationTests(unittest.TestCase):
         self.case = scenarios()[0]
         self.proposal = {'action': 'MONITOR', 'evidence_ids': ['C-001'], 'rationale': 'Test'}
 
-    def test_challenge_suite_rejects_monitor_even_with_retrieved_citation(self):
+    def test_challenge_suite_applies_revised_policy_to_retrieved_citations(self):
         self.assertEqual(len(scenarios('all')), 5)
         for case in scenarios('challenges'):
             with self.subTest(case=case['case_id']):
@@ -57,19 +57,24 @@ class InvestigationTests(unittest.TestCase):
                 desk.read('warehouse')
                 ids = [r['evidence_id'] for r in desk.evidence]
                 decision = enforce(case, dict(self.proposal, evidence_ids=ids), desk)
-                self.assertEqual(decision['final_action'], 'ESCALATE')
+                self.assertEqual(decision['final_action'], case['expected_action'])
                 result = investigate(case)
                 self.assertTrue(result['matches_developer_expectation'])
                 self.assertNotIn('_source_failures', result['initial_evidence'])
 
-    def test_stale_case_isolates_age_limit(self):
+    def test_old_collection_scan_accepted_without_age_limit(self):
         case = scenarios('challenges')[0]
         desk = EvidenceDesk(case)
         desk.read('carrier')
-        self.assertIsNone(qualifying_collection(case, desk.evidence))
-        # Same scan is eligible at 09:00, but is 90 minutes old at 10:00.
-        case['decision_at'] = '2026-11-08T09:00:00+00:00'
-        self.assertEqual(qualifying_collection(case, desk.evidence), 'C-001')
+        for decision_at in ['2026-11-08T09:00:00+00:00', '2026-11-08T10:00:00+00:00',
+                            '2026-11-10T10:00:00+00:00']:
+            # Hold other facts fixed: passage of time alone does not erase collection.
+            case['decision_at'] = decision_at
+            self.assertEqual(qualifying_collection(case, desk.evidence), 'C-001')
+        result = investigate(case)
+        self.assertEqual(result['policy']['version'], 'investigation-1.1')
+        self.assertNotIn('max_evidence_age_minutes', result['policy'])
+        self.assertEqual(result['final_action'], 'MONITOR')
 
     def test_carrier_timeout_is_visible_without_becoming_agent_failure(self):
         result = investigate(scenarios('challenges')[2])
@@ -107,7 +112,7 @@ class InvestigationTests(unittest.TestCase):
         self.assertEqual(desk.read('carrier')['evidence'], [])
         self.assertEqual(enforce(self.case, self.proposal, desk)['final_action'], 'ESCALATE')
 
-    def test_stale_wrong_shipment_and_invalid_timing_rejected(self):
+    def test_pre_discrepancy_wrong_shipment_and_invalid_timing_rejected(self):
         changes = [dict(observed_at='2026-11-08T08:30:00+00:00'),
                    dict(shipment_id='OTHER'), dict(observed_at='2026-11-08T10:05:00+00:00'),
                    dict(observed_at='not-a-date')]
@@ -179,13 +184,13 @@ class InvestigationSDKTests(unittest.TestCase):
             self.assertNotIn('expected_action', json.dumps(model.inputs))
             self.assertIn('C-001' if resolved else 'W-001', json.dumps(model.inputs[-1]))
 
-    def test_sdk_unsafe_proposals_on_challenges_are_overridden(self):
+    def test_sdk_monitor_proposals_follow_revised_challenge_policy(self):
         for case in scenarios('challenges'):
             with self.subTest(case=case['case_id']):
                 model = InvestigationModel(resolved=True)
                 result = investigate(case, mode='openai', model=model)
                 self.assertEqual(result['proposal']['action'], 'MONITOR')
-                self.assertEqual(result['final_action'], 'ESCALATE')
+                self.assertEqual(result['final_action'], case['expected_action'])
                 self.assertIsNone(result['agent_error_type'])
                 self.assertNotIn('_source_failures', json.dumps(model.inputs))
                 self.assertEqual(result['ai']['usage']['requests'], 2)

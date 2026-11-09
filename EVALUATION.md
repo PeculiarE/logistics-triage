@@ -85,4 +85,22 @@ Reviewed local run `investigation-20261108T224752Z-82e592dc` with configured mod
 
 All three proposals cited retrieved evidence and matched the configured expected outcomes. Each invoked both carrier and warehouse tools. There were zero recorded agent failures and one deliberate carrier-source timeout. No unsafe proposal was overridden in this live run: the model itself proposed escalation in each case. Tool traces record execution order, not necessarily separate model turns (both tools can be requested together). These small developer-defined tests establish behaviour on the fixtures, not policy validity or business effectiveness. Raw run records remain local and ignored by Git.
 
-**Policy review, 9 November 2026:** The stale-scan outcome follows an age rule now recognised as poorly justified for establishing a past collection event. Passing that case is evidence of rule compliance, not correct business policy. Code and expected outcome are still unchanged; see INVESTIGATION.md for the proposed correction.
+**Policy review, 9 November 2026:** The stale-scan outcome follows an age rule now recognised as poorly justified for establishing a past collection event. Passing that case is evidence of rule compliance, not correct business policy. This review prompted the policy 1.1 correction recorded below; earlier runs remain unchanged.
+
+## Policy 1.1 verification — 9 November 2026
+
+Removed age alone as a reason to reject evidence of a past carrier collection. Both the executable gate and model-facing rules now use `investigation-1.1`. CASE-STALE-SCAN now expects MONITOR; the other four outcomes are unchanged. All 39 automated tests pass, including the revised scripted-SDK expectations and continued rejection of wrong-shipment, future, contradictory and unavailable evidence. The full scripted suite yields 2 MONITOR and 3 ESCALATE, zero agent errors and one deliberate source error.
+
+No live model calls were made during implementation; the subsequent user-run live review is documented below. The policy 1.0 live results above remain historical evidence of the old behaviour and must not be presented as validation of policy 1.1. Existing saved run files were not edited.
+
+## Live policy 1.1 challenge review — 9 November 2026
+
+Reviewed run `investigation-20261109T090117Z-eb9e0d5d` using configured model `gpt-5-mini`.
+
+| Case | AI proposal | Final action | Requests | Total tokens |
+|---|---|---|---:|---:|
+| CASE-STALE-SCAN | MONITOR | MONITOR | 2 | 1,819 |
+| CASE-WRONG-SHIPMENT | ESCALATE | ESCALATE | 2 | 2,144 |
+| CASE-CARRIER-UNAVAILABLE | ESCALATE | ESCALATE | 3 | 2,304 |
+
+The old-scan case retrieved carrier evidence only and cited C-001. The wrong-shipment case retrieved carrier and warehouse evidence, citing C-001 and W-001. The unavailable-carrier case recorded the intentional source timeout and cited warehouse record W-001. There were zero agent errors and one source error. No proposal override occurred. All three records used policy investigation-1.1. Compared with the earlier policy 1.0 run, only the old-scan final category changed. These are reviewed examples, not a reliability benchmark.
