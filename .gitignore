@@ -8,3 +8,6 @@ runs/
 data/
 DataCoSupplyChainDataset.csv
 .DS_Store
+
+# Personal interview preparation stays local.
+/INTERVIEW_PREPARATION.md
