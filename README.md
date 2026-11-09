@@ -1,88 +1,46 @@
 # Logistics Triage — Bounded Autonomy Prototype
 
-A historical logistics replay that sends minor, low-value delays to a **simulated monitoring queue** and routes uncertain or higher-impact cases to **human review**. An optional OpenAI Agents SDK agent gathers evidence with tools and proposes an action; deterministic application rules enforce the final decision.
+A Python prototype for exploring which logistics decisions a program may handle automatically and which need human review. An AI model can gather evidence and propose an action; application code checks whether that action is permitted before recording the result.
 
-**Status:** Offline replay implemented; live AI smoke tests completed on 7 November 2026 using synthetic orders (five-order and ten-order runs, zero recorded agent failures). The ten-order run produced 1 monitor, 7 human review, and 2 no-action decisions. See [EVALUATION.md](EVALUATION.md) for evidence and limitations. Live mode requires your own locally configured API key and available model. All operational actions remain simulated; no tracking follow-ups or human notifications are implemented. This is a research prototype, not a production logistics system.
+The project has two separate demonstrations:
 
-![Synthetic historical replay report](docs/demo.png)
+| Demonstration | Question | Data | Entry point |
+|---|---|---|---|
+| Historical order triage | How should this recorded order be categorised? | DataCo historical orders or ten fictional example orders | `triage.py` |
+| Shipment investigation | Is there sufficient evidence of carrier collection to allow monitoring? | Five fictional, time-stamped shipment scenarios | `investigation.py` |
 
-## Try it in one minute
+**Current status:** Both demonstrations have been exercised with a live model on synthetic examples. All **39 automated tests** passed with the optional SDK installed. All operational actions remain simulated: there are no real carrier connections, customer messages, shipment changes or scheduled rechecks. See [EVALUATION.md](EVALUATION.md) for the verification record.
 
-Python 3.9+ is sufficient for the offline demo. No API key or external packages are required.
+**Known policy issue:** The investigation currently rejects collection scans older than 60 minutes. That rule is poorly justified for establishing whether a past collection occurred: age alone does not invalidate the event. The code and stale-scan expected outcome have not yet been corrected. See [the investigation walkthrough](INVESTIGATION.md) for the policy review.
+
+## Run locally without API calls
+
+From the repository folder, Python 3.9+ can run both demonstrations without third-party packages:
 
 ```sh
+# Sort all ten fictional orders using fixed rules.
 python3 triage.py --limit 0
-python3 -m unittest -v
+
+# Investigate the original two fictional cases using scripted logic.
+python3 investigation.py
+
+# Run the three boundary cases, or all five cases.
+python3 investigation.py --suite challenges
+python3 investigation.py --suite all
 ```
 
-The first command runs ten synthetic orders and prints the path to `report.html`. Open that file in a browser to inspect the decisions. Expected routes: **1 monitor, 7 human review, 2 no action**.
+Each command prints a local `report.html` path. Open that file in a browser to inspect the results. Offline triage and scripted investigation use ordinary code, not a live AI.
 
-A pre-generated synthetic report is included at `docs/demo.html`; download and open it locally. See [EVALUATION.md](EVALUATION.md) for the full-dataset offline run and the difference between software verification and operational evaluation.
+The original two investigation cases are:
 
-Use your locally downloaded DataCo file:
+- **CASE-RESOLVED:** A newer carrier collection scan resolves the initial discrepancy → MONITOR.
+- **CASE-UNCONFIRMED:** Carrier evidence does not confirm collection; warehouse evidence says only PREPARED → ESCALATE.
 
-```sh
-python3 triage.py --csv "$HOME/Downloads/DataCoSupplyChainDataset.csv" --limit 200
-```
+The challenge suite covers an old collection scan, a scan for the wrong shipment, and a simulated carrier timeout. All currently escalate under the written policy; the old-scan rule has the limitation noted above.
 
-Replay every distinct order locally:
+## Run with a live model
 
-```sh
-python3 triage.py --csv "$HOME/Downloads/DataCoSupplyChainDataset.csv" --limit 0
-```
-
-Each run creates a separate folder under `runs/` containing:
-
-- `report.html`: a self-contained visual report with summary counts and up to 40 examples per action.
-- `decisions.jsonl`: one audit record per processed order, including evidence, proposal, policy, final decision, and UTC timestamp.
-- `queues.jsonl`: simulated monitoring or human-review queue entries; no-action records are also retained.
-- `summary.json`: source checksum, input counts, sample seed, policy configuration, decision counts, and agent failures.
-
-The log is written once per run. It is neither tamper-proof nor a production event store. Queue creation and audit writing are not transactional.
-
-## Decision flow
-
-```mermaid
-flowchart LR
-    A[Aggregate order items] --> B[Inspect allowed evidence]
-    B --> C[Propose action]
-    C --> D{Enforce policy in code}
-    D -->|Minor delay within limits| E[Simulated monitoring queue]
-    D -->|Uncertain or higher impact| F[Human-review queue]
-    D -->|Consistent record without delay| G[No action]
-    E --> H[Decision audit]
-    F --> H
-    G --> H
-```
-
-Default demonstration policy:
-
-| Condition | Final behaviour |
-|---|---|
-| Missing, invalid or conflicting evidence | Escalate |
-| Canceled, fraud-flagged or unknown status | Escalate |
-| Delayed order with a hold or unresolved payment status | Escalate |
-| Recorded delay greater than 1 day | Escalate |
-| Delayed order value greater than 500 dataset monetary units | Escalate |
-| Minor delay, eligible status, value within limit, complete evidence, matching proposal | Simulate monitoring |
-| Consistent record without delay, matching proposal | No action |
-| Proposal confidence below 0.90, invalid proposal, skipped evidence tools, or agent failure | Escalate |
-
-Thresholds are illustrative design choices, not Scania policy. Currency has not been verified. The system does not infer production impact, material criticality, or delay causes from order value.
-
-## Confidence and authority
-
-Evidence completeness is the fraction of six required fields available. Conflicting source rows and contradictory labels are checked separately. Completeness does not prove that the source is correct.
-
-In **offline mode**, a deterministic simulator produces the proposal; no LLM runs. Its score of 1.0 denotes deterministic agreement with the policy, not a probability of business correctness. Offline proposal agreement is true by construction and is not an accuracy metric.
-
-In **OpenAI mode**, the agent returns a self-reported confidence score. It is **uncalibrated**. A score above the threshold never authorises an action that violates the code-enforced rules. Calibration would require labelled, independent decisions and reliability analysis before production use.
-
-The AI can recommend a more conservative escalation. It cannot authorise refunds, change shipments, contact customers, or bypass a rule. Agent failures are logged by exception type without storing potentially sensitive error messages.
-
-## Optional: enable the OpenAI Agents SDK
-
-Use Python 3.10+ for optional SDK dependencies. Create an isolated environment:
+Use Python 3.10+ for the optional SDK. Create an environment once, then install the pinned dependencies:
 
 ```sh
 python3 -m venv .venv
@@ -90,67 +48,151 @@ source .venv/bin/activate
 python -m pip install -r requirements-ai.txt
 ```
 
-Create an API key in your OpenAI account and configure it **locally**, outside this repository. Do not paste a key into a chat or commit it. On macOS, the following reads the key without displaying it:
+If the environment already exists, activate it with `source .venv/bin/activate`.
+
+Configure your API key privately in the same Terminal session. On macOS's default zsh shell, run this line **exactly as written**:
 
 ```sh
-read -s "OPENAI_API_KEY?Paste API key locally, then press Enter: "
+read -s "OPENAI_API_KEY?Enter key: "
+```
+
+Press Return first. When `Enter key:` appears, paste the key and press Return again. The pasted key stays invisible. Do not insert the key into the command itself, paste it into chat, or commit it to Git. Then run:
+
+```sh
 export OPENAI_API_KEY
 echo
 read "OPENAI_MODEL?Enter an available API model ID: "
 export OPENAI_MODEL
-python triage.py --mode openai --limit 5
 ```
 
-Those `read` commands use macOS's default zsh shell. `.env.example` documents the variable names; this app does not automatically load `.env` files. Model calls may incur charges; check your API account's access and billing first. No particular model ID is hardcoded.
+Choose a model available to your API account that supports function calling and structured output. Reviewed runs used the configured name `gpt-5-mini`; this is not a guarantee of account access or a recorded exact model version. Check API access and billing before making calls.
 
-Start with the synthetic dataset. The live mode caps each run at 20 orders and each order at six SDK turns. These caps bound the demo size, not its monetary cost. SDK tracing uploads are disabled; local audit records are used instead.
+Choose one demonstration:
 
-The SDK agent calls `inspect_order` and `inspect_policy`, then returns a structured recommendation. The host verifies that both tools were called and applies the independent policy gate. Only allowlisted order fields are exposed. The optional live integration has completed basic smoke tests on the bundled synthetic cases. These tests establish a working connection and workflow on those cases, not real-world decision quality.
+```sh
+# Live AI triage of five fictional orders.
+python triage.py --mode openai --limit 5
 
-Documentation: [OpenAI Agents SDK quickstart](https://developers.openai.com/api/docs/guides/agents/quickstart).
+# Live investigation of the original two cases.
+python investigation.py --mode openai
 
-## Data interpretation and limitations
+# Live investigation of the three challenge cases.
+python investigation.py --mode openai --suite challenges
+```
 
-- The supplied DataCo v3 CSV contains **180,519 order-item rows and 65,752 distinct Order Id values**. Decisions must be made after grouping items by order. Order value is the sum of `Order Item Total`; repeated totals such as `Sales per customer` are not summed.
-- `Days for shipping (real)` and `Delivery Status` are recorded historical outcomes. This prototype deliberately uses them for **retrospective outcome replay**, not advance delay prediction or live intervention. It does not estimate how a policy would have performed with only information available before the outcome.
-- The timing field is not a verified customer-arrival timestamp. Its precise operational meaning needs validation against the source data dictionary. Use a live tracking snapshot and an explicit decision timestamp for a prospective system.
-- `Late_delivery_risk` is not used as an input or treated as a model prediction. Outcome labels are used only for consistency checks within the retrospective replay.
-- Existing completed orders are routed to hypothetical queues to demonstrate decision boundaries; monitoring them now has no operational value.
-- Samples are selected with a seeded shuffle of distinct orders. They are reproducible for the same source file and seed, but are not a chronological holdout or a labelled effectiveness evaluation.
-- Routing counts are not measures of prediction accuracy, workload saved, financial benefit, or decision quality. A domain expert should label a held-out set of scenarios; then measure unsafe auto-actions, appropriate escalations, automation coverage, confidence calibration, latency, and cost.
-- Order value is only an illustrative impact proxy. The dataset lacks verified criticality, available alternatives, inventory state, production interruption risk, and the cost of intervention.
-- Source items with conflicting attributes or duplicate/missing item identifiers are escalated. Missing order IDs become separate review cases rather than being merged.
+These commands make real model calls but still perform only simulated logistics actions. Triage caps live runs at 20 orders. Both adapters cap each case at six model turns. Those limits bound the demonstration size, not monetary cost. SDK trace uploads are disabled.
 
-## Privacy and publication
+The environment variables last for the Terminal session. `.env.example` documents their names; the application does not load `.env` files automatically.
 
-The source CSV remains outside the repository. The reader retains only order ID, item ID, item total, recorded and scheduled timing, delivery status, order status, and shipping mode. Names, addresses, email, customer passwords, customer IDs, coordinates, and product text are excluded from retained evidence and API inputs.
+## How decisions are made
 
-Raw data, local run outputs, environments, and secrets are ignored by Git. The bundled ten-order fixture is **synthetic**. Inspect the files being staged before publication; never force-add the original CSV or local run outputs.
+### Historical triage
 
-## Tests and research extensions
+```text
+Group item rows into orders → propose a category → enforce policy → save decision and simulated queue entry
+```
 
-The test suite checks aggregation, duplicate item detection, missing identifiers, invalid numbers, confidence boundaries, high-confidence unsafe recommendations, agent failures, source-field privacy, and report escaping. These tests validate software policy enforcement; they do not establish business effectiveness.
+Offline mode generates the proposal with fixed rules. Live mode uses `sdk_agent.py`: the model must call `inspect_order` and `inspect_policy`, then return an action, confidence and explanation. The host checks that both tools ran and independently enforces the policy.
 
-With optional dependencies installed, four additional tests run the **actual SDK tool loop with a scripted model**. They verify tool execution, structured outputs, refusal to accept skipped evidence tools, handling of a model failure, and enforcement against an unsafe recommendation. These use no network or credentials and do not test live model quality.
+| Condition | Behaviour |
+|---|---|
+| Missing, invalid, contradictory or unrecognised evidence | ESCALATE |
+| Canceled or fraud-flagged order | ESCALATE |
+| Delayed order with hold or unresolved payment status | ESCALATE |
+| Delay over 1 day or delayed-order value over 500 dataset monetary units | ESCALATE |
+| Minor delay, complete consistent evidence, eligible status and matching proposal | MONITOR |
+| Consistent non-delayed record and matching proposal | NO_ACTION |
+| Invalid proposal, low confidence, required tools skipped, or per-order agent failure | ESCALATE |
 
-Next research steps: replace historical outcomes with time-correct snapshots, validate autonomy boundaries with a logistics expert, label independent test cases, calibrate confidence, compare an agent against a deterministic baseline, and use an authenticated review workflow with durable queues and transactional audit storage.
+These thresholds are illustrative, not validated business policy. Currency is unverified. Evidence completeness measures the presence of six fields; separate checks address inconsistencies. It does not establish source accuracy.
+
+The live model's confidence is self-reported and uncalibrated. Offline confidence of 1.0 means agreement with the rules by construction, not certainty about business correctness. A model cannot override the code's limits and can request a more conservative escalation.
+
+### Shipment investigation
+
+```text
+Initial discrepancy → choose evidence tools → inspect returned evidence → propose with citations → enforce policy → save simulated case entry
+```
+
+`investigation.py` provides scenarios, source adapters, evidence checks and reporting. `investigation_agent.py` provides the live model instructions and tool loop. The model can request carrier and warehouse evidence; scripted mode instead chooses steps through fixed logic.
+
+A monitoring proposal must cite a qualifying carrier record actually retrieved during the investigation. Warehouse preparation does not prove collection. The host checks shipment identity, event times, availability by the scenario's decision time, the current age limit, status and value limits. A source failure prevents automatic monitoring.
+
+The model does not receive expected answers or fixture failure settings. The report records tool execution order and results, not hidden model reasoning. Multiple tools can be requested in one model turn.
+
+See [INVESTIGATION.md](INVESTIGATION.md) for the full walkthrough and policy details.
+
+## What has been tested
+
+| Verification | Observed result |
+|---|---|
+| Full DataCo offline replay | 65,752 orders: 8,155 MONITOR, 30,748 ESCALATE, 26,849 NO_ACTION |
+| Live triage on ten distinct synthetic orders (five-order and ten-order runs) | No recorded agent failures; ten-order run: 1 MONITOR, 7 ESCALATE, 2 NO_ACTION |
+| Live investigation on two basic scenarios | 1 MONITOR, 1 ESCALATE; no recorded agent failures |
+| Live investigation on three challenge scenarios | 3 ESCALATE; no recorded agent failures, one intentionally simulated source timeout |
+| Automated test suite | 39 passing tests with the optional SDK installed |
+
+Run the tests without model calls:
+
+```sh
+python -m unittest -v
+```
+
+Tests cover data handling, policy boundaries, evidence citations and timestamps, source failures, reporting, usage logging and actual SDK tool loops with scripted models. Without optional dependencies, SDK tests are skipped.
+
+**These results do not demonstrate an advantage over rules.** The scripted investigator reaches the same categories on the five examples. The immediate-escalation baseline in the audit is a comparison label: it represents sending a discrepancy straight to human review without investigating. It has less information than either investigator, so resolving more cases than that baseline does not establish AI superiority.
+
+The scenarios have developer-defined expectations. Rule compliance, including compliance with the disputed old-scan rule, is not proof of business correctness. Independent cases, domain-expert judgements and operational evaluation are still needed.
+
+## Output files and usage records
+
+Each run writes a separate directory under `runs/`:
+
+| File | Historical triage | Investigation |
+|---|---|---|
+| `report.html` | Counts and up to 40 examples per category | Starting facts, tool results, proposal and final decision for each case |
+| `decisions.jsonl` | One full audit record per order | — |
+| `investigations.jsonl` | — | One full audit record per scenario |
+| `queues.jsonl` | Simulated queue entries | Simulated case queue entries |
+| `summary.json` | Input checksum, settings, decision counts, failures and usage totals | —; usage is stored per case in the audit |
+
+New live records include the configured model name and SDK-reported request and token counts. Cached input tokens and reasoning output tokens are subsets, not additional tokens to add to the total. Configured model names may be aliases; exact resolved model versions are not captured. Earlier run files are unchanged and lack metadata introduced later.
+
+Failed model runs may have unavailable usage even if some calls were billed. Reported totals are not a billing statement and may omit failures or retries. No monetary costs are calculated. A source timeout and an agent/provider error are recorded separately in investigation runs.
+
+Files are local reports, not tamper-proof audit storage. Audit and queue writes are not transactional. A MONITOR entry does not schedule a later check, and an ESCALATE entry does not notify a person.
+
+![Synthetic historical replay report](docs/demo.png)
+
+The screenshot and [saved demo report](docs/demo.html) show the original historical replay, not the investigation workflow.
+
+## Historical data and privacy
+
+The DataCo CSV contains **180,519 item rows representing 65,752 distinct orders**. The reader groups items by order and sums `Order Item Total`. Missing identifiers, duplicate items and conflicting attributes are checked rather than silently accepted.
+
+To use your local copy:
+
+```sh
+python3 triage.py --csv "$HOME/Downloads/DataCoSupplyChainDataset.csv" --limit 200
+# Use --limit 0 to replay all orders in offline mode.
+```
+
+Actual shipping duration and delivery labels are historical outcomes. This replay is not advance delay prediction or an evaluation of decisions made before those outcomes were known. The original timing field is not a verified customer-arrival timestamp. `Late_delivery_risk` is not used as a predictive input.
+
+The investigation scenarios are separately invented decision-time snapshots. They do not add genuine tracking histories to the DataCo orders. Order value is only an illustrative impact proxy; neither demonstration establishes production criticality or real intervention costs.
+
+Only allowlisted logistics fields are retained from the CSV. Customer names, email, passwords, addresses, coordinates and other personal fields are excluded from retained evidence and model inputs. Raw data, local run outputs, environments and secret files are ignored by Git. The public fixtures are synthetic.
+
+## Next development priorities
+
+- Correct and test the distinction between historical collection evidence and freshness of current status.
+- Validate decision rights, evidence requirements and thresholds with logistics practitioners.
+- Compare the live investigator against a scripted investigator with equal access to evidence on independent cases.
+- Evaluate unsafe actions, unnecessary escalations, explanation quality, time and API usage.
+- Add operational integrations, durable case storage, human review and scheduled follow-up only after defining their requirements.
 
 ## Source and attribution
 
-Constante, Fabian; Silva, Fernando; Pereira, António (2019), **DataCo SMART SUPPLY CHAIN FOR BIG DATA ANALYSIS**, Mendeley Data, V3. DOI: [10.17632/8gx2fvg2k6.3](https://doi.org/10.17632/8gx2fvg2k6.3). Source licence: **CC BY 4.0**, as stated on the [dataset page](https://data.mendeley.com/datasets/8gx2fvg2k6/3).
+Constante, Fabian; Silva, Fernando; Pereira, António (2019), **DataCo SMART SUPPLY CHAIN FOR BIG DATA ANALYSIS**, Mendeley Data, V3. DOI: [10.17632/8gx2fvg2k6.3](https://doi.org/10.17632/8gx2fvg2k6.3). Dataset licence: CC BY 4.0, as stated on the [source page](https://data.mendeley.com/datasets/8gx2fvg2k6/3).
 
-Transformations: selected non-customer columns, grouped item rows into orders, summed item totals, calculated recorded delay, applied illustrative rules, and generated simulated queues. This project is independent and is not affiliated with or endorsed by Scania or the dataset contributors.
-
-## Model and API usage records
-
-New live runs save an `ai` object in each `decisions.jsonl` record, containing `configured_model` and SDK-reported `usage`: request count, input tokens, output tokens, total tokens, cached input tokens and reasoning output tokens. Counts cover the order's completed SDK run, including tool-use turns. Cached tokens are a subset of input tokens and reasoning tokens a subset of output tokens; do not add them again to the total.
-
-`summary.json` includes `ai_usage`, listing configured models, orders with and without usage, and sums of reported usage. Offline runs use `null` for AI metadata. Failed runs without a returned SDK result have unavailable (`null`) usage, even if some requests may have been billed. Reported totals are not a billing statement and may omit failed requests or retries. SDK-normalized counts may also omit provider detail. No monetary cost is calculated.
-
-The configured model name may be an alias; it is not a verified resolved model version. The HTML report still shows routing results; inspect the JSON files for model and usage details. Historical run files are unchanged and cannot have missing token counts reconstructed by this change. No API keys are stored in the metadata.
-
-## New: investigate a shipment discrepancy
-
-A separate, fictional investigation demo (two basic cases and three boundary cases) is available in [INVESTIGATION.md](INVESTIGATION.md). Run `python investigation.py` for the no-API scripted walkthrough, or `python investigation.py --mode openai` after local API setup to let a live model choose evidence tools. The host validates retrieved carrier evidence before writing simulated queue entries. The DataCo replay remains unchanged. The two basic cases have also been reviewed with a live model. All three boundary cases have also been run with a live model and reviewed; the results are recorded in EVALUATION.md. Run them with `python investigation.py --mode openai --suite challenges`.
-
-**Known investigation policy issue:** the stale-scan age limit is under review; age alone does not invalidate evidence that collection occurred. See the policy issue in [INVESTIGATION.md](INVESTIGATION.md). The current rule has not yet been changed.
+Transformations: selected non-customer columns, grouped item rows into orders, summed item totals, calculated recorded delay, applied illustrative rules and generated simulated queues. This independent project is not affiliated with or endorsed by the dataset contributors.
