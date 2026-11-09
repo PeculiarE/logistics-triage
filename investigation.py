@@ -28,7 +28,7 @@ POLICY = {
 }
 
 
-def scenarios():
+def scenarios(suite="basic"):
     """Invented decision-time snapshots, not additions to the DataCo dataset."""
     base = {
         'shipment_id': 'SHIP-001', 'decision_at': '2026-11-08T10:00:00+00:00',
@@ -50,7 +50,22 @@ def scenarios():
     unresolved['warehouse'] = [dict(evidence_id='W-001', shipment_id='SHIP-001', source='warehouse',
         status='PREPARED', observed_at='2026-11-08T09:30:00+00:00',
         available_at='2026-11-08T09:31:00+00:00', note='Prepared for collection; pickup not confirmed.')]
-    return [resolved, unresolved]
+    basic = [resolved, unresolved]
+    stale = deepcopy(resolved)
+    stale.update(case_id='CASE-STALE-SCAN', expected_action='ESCALATE',
+                 initial_observed_at='2026-11-08T08:00:00+00:00')
+    stale['carrier'][0].update(observed_at='2026-11-08T08:30:00+00:00',
+                               available_at='2026-11-08T08:32:00+00:00')
+    stale['warehouse'] = deepcopy(unresolved['warehouse'])
+    wrong = deepcopy(resolved)
+    wrong.update(case_id='CASE-WRONG-SHIPMENT', expected_action='ESCALATE')
+    wrong['carrier'][0]['shipment_id'] = 'SHIP-OTHER'
+    wrong['warehouse'] = deepcopy(unresolved['warehouse'])
+    failure = deepcopy(unresolved)
+    failure.update(case_id='CASE-CARRIER-UNAVAILABLE', expected_action='ESCALATE',
+                   _source_failures=['carrier'])
+    challenges = [stale, wrong, failure]
+    return {'basic': basic, 'challenges': challenges, 'all': basic + challenges}[suite]
 
 
 def timestamp(value):
@@ -70,6 +85,8 @@ class EvidenceDesk:
 
     def read(self, source):
         try:
+            if source in self.case.get('_source_failures', []):
+                raise TimeoutError('Simulated source timeout')
             rows = deepcopy(self.case[source])
             if not isinstance(rows, list):
                 raise ValueError('Invalid source response')
@@ -165,7 +182,7 @@ def investigate(case, mode='scripted', model=None):
     decision = enforce(case, proposal, desk, error)
     return {
         'case_id': case['case_id'], 'mode': mode, 'synthetic': True, 'simulation_only': True,
-        'initial_evidence': {k: v for k, v in case.items() if k not in {'carrier', 'warehouse', 'expected_action'}},
+        'initial_evidence': {k: v for k, v in case.items() if not k.startswith('_') and k not in {'carrier', 'warehouse', 'expected_action'}},
         'policy': deepcopy(POLICY), 'tool_trace': desk.trace, 'proposal': proposal,
         'ai': metadata, 'agent_error_type': error, **decision,
         'expected_action': case['expected_action'],
@@ -206,16 +223,20 @@ warehouse preparation alone cannot. Expected outcomes are developer-defined exam
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=['scripted', 'openai'], default='scripted')
+    parser.add_argument('--suite', choices=['basic', 'challenges', 'all'], default='basic',
+                        help='basic: original two cases; challenges: three boundary cases; all: five cases.')
     parser.add_argument('--output', type=Path, default=ROOT / 'runs')
     args = parser.parse_args()
     if args.mode == 'openai':
         from investigation_agent import check_configuration
         check_configuration()
-    records = [investigate(case, args.mode) for case in scenarios()]
+    records = [investigate(case, args.mode) for case in scenarios(args.suite)]
     output = args.output / ('investigation-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     write_outputs(output, records)
     for r in records:
         print(r['case_id'], '→', r['final_action'], '| tools:', ', '.join(t['tool'] for t in r['tool_trace']))
+    print('Agent errors:', sum(r['agent_error_type'] is not None for r in records),
+          '| Source errors:', sum(any('error_type' in t['result'] for t in r['tool_trace']) for r in records))
     print('Mode:', args.mode, '| All scenarios and actions are simulated.')
     print('Open report:', output / 'report.html')
 

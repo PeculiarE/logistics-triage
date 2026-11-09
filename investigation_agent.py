@@ -42,7 +42,7 @@ def propose(case, desk, metadata, model=None):
                       'Return a recommendation; application code enforces policy and records simulated actions. '
                       'Policy: ' + json.dumps(POLICY)),
         tools=[inspect_carrier, inspect_warehouse], output_type=Recommendation)
-    initial = {k: v for k, v in case.items() if k not in {'carrier', 'warehouse', 'expected_action'}}
+    initial = {k: v for k, v in case.items() if not k.startswith('_') and k not in {'carrier', 'warehouse', 'expected_action'}}
     result = Runner.run_sync(agent, json.dumps(initial), max_turns=6)
     usage = result.context_wrapper.usage
     metadata['usage'] = {k: getattr(usage, k) for k in ['requests', 'input_tokens', 'output_tokens', 'total_tokens']}

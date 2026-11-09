@@ -52,3 +52,31 @@ MONITOR still means a local monitoring entry. ESCALATE still means a local human
 - `test_investigation.py`: policy boundary tests and scripted SDK tool-loop tests.
 
 All 35 project tests passed after this addition: 22 existing tests and 13 investigation tests. They cover both scenarios, tool ordering in scripted runs, invented citations, missing tools, source identity, future/stale evidence, invalid timing, conflicting records, value/status limits, tool/provider failures, saved outputs and HTML escaping. These verify software behaviour, not real-world effectiveness.
+
+## Three additional boundary cases
+
+Run just the challenges without API calls:
+
+```sh
+python investigation.py --suite challenges
+```
+
+Then, with API configuration in your current terminal, run the same three cases with the live model:
+
+```sh
+python investigation.py --mode openai --suite challenges
+```
+
+Use `--suite all` for all five cases. The default `--suite basic` preserves the original two-case demonstration.
+
+| Case | Deliberately unsuitable evidence | Expected final decision |
+|---|---|---|
+| CASE-STALE-SCAN | Collection at 08:30, after the initial 08:00 snapshot, but 90 minutes before the 10:00 decision; example policy permits at most 60 minutes | ESCALATE |
+| CASE-WRONG-SHIPMENT | Recent collection scan identifies SHIP-OTHER rather than SHIP-001 | ESCALATE |
+| CASE-CARRIER-UNAVAILABLE | Simulated carrier lookup raises a timeout; no carrier evidence is returned | ESCALATE |
+
+Warehouse preparation evidence remains available in each challenge, but cannot establish collection. The freshness limit is an illustrative policy, not a claim that collection stops being true after an hour.
+
+A source timeout is distinct from an agent/provider failure. `Source errors: 1` is expected in a run that queries the deliberately unavailable carrier. Inspect the trace for `TimeoutError`; `agent_error_type` can remain null because the model successfully received and handled the tool's error result. The fixture's failure settings are not sent to the model in the starting information.
+
+All 39 automated tests passed after adding the challenges. Four new tests cover scenario routing, isolation of the age limit, source-versus-agent failures, and actual SDK runs with deliberately unsafe scripted MONITOR proposals. Those proposals are overridden to ESCALATE by the host. This does not claim that a live model made those mistakes.

@@ -59,3 +59,7 @@ After adding model and usage metadata, all 22 automated tests passed locally. Tw
 ## Separate investigation demo — 8 November 2026
 
 Added two fictional decision-time shipment scenarios and a separate optional live investigator. The scripted run produces CASE-RESOLVED → MONITOR after carrier inspection, and CASE-UNCONFIRMED → ESCALATE after carrier and warehouse inspection. All 35 automated tests passed (22 existing plus 13 investigation tests), including actual SDK execution with scripted models. No paid calls were made for this addition. See INVESTIGATION.md for policy definitions and comparison limits; no new live-model or business-effectiveness results are claimed.
+
+## Investigation challenge implementation
+
+Added three runnable challenges: stale scan, wrong shipment and unavailable carrier. Scripted runs escalate all three, with one intentional source timeout and zero agent errors. All 39 automated tests pass, including deliberately unsafe MONITOR proposals through the SDK with scripted models. No paid calls were made during implementation.
