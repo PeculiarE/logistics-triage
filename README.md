@@ -148,3 +148,7 @@ New live runs save an `ai` object in each `decisions.jsonl` record, containing `
 `summary.json` includes `ai_usage`, listing configured models, orders with and without usage, and sums of reported usage. Offline runs use `null` for AI metadata. Failed runs without a returned SDK result have unavailable (`null`) usage, even if some requests may have been billed. Reported totals are not a billing statement and may omit failed requests or retries. SDK-normalized counts may also omit provider detail. No monetary cost is calculated.
 
 The configured model name may be an alias; it is not a verified resolved model version. The HTML report still shows routing results; inspect the JSON files for model and usage details. Historical run files are unchanged and cannot have missing token counts reconstructed by this change. No API keys are stored in the metadata.
+
+## New: investigate a shipment discrepancy
+
+A separate fictional two-case investigation demo is available in [INVESTIGATION.md](INVESTIGATION.md). Run `python investigation.py` for the scripted walkthrough, or `python investigation.py --mode openai` after API setup. The host validates retrieved carrier evidence before recording simulated queue entries. The DataCo replay is unchanged. The new adapter has scripted-SDK tests and awaits live review.
